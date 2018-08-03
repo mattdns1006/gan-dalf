@@ -1,5 +1,4 @@
 from __future__ import print_function, division
-
 from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import Activation 
@@ -30,7 +29,11 @@ class GAN():
             metrics=['accuracy'])
 
         # Build the generator
-        self.generator = self.build_generator()
+        if self.load == True:
+            print('loaded generator')
+            self.generator = load_model('gen.h5')
+        else:
+            self.generator = self.build_generator()
 
         # The generator takes noise as input and generates imgs
         z = Input(shape=(self.latent_dim,))
@@ -44,13 +47,8 @@ class GAN():
 
         # The combined model  (stacked generator and discriminator)
         # Trains the generator to fool the discriminator
-        if self.load == True:
-            print('loading')
-            self.combined = load_model('model.h5')
-        else:
-            self.combined = Model(z, validity)
+        self.combined = Model(z, validity)
         self.combined.compile(loss='binary_crossentropy', optimizer=optimizer)
-        pdb.set_trace()
 
     def build_generator(self):
 
@@ -142,14 +140,18 @@ class GAN():
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 print("Saving")
+                self.generator.save('gen.h5')
                 self.combined.save('model.h5')
                 self.sample_images(epoch)
 
-    def sample_images(self, epoch):
-        r, c = 5, 5
+    def sample_images(self, epoch, n = 5):
+        r, c = n, n 
         noise = np.random.normal(0, 1, (r * c, self.latent_dim))
         gen_imgs = self.generator.predict(noise)
         real_or_fake = self.discriminator.predict(gen_imgs)
+        sorted_idx = np.argsort(real_or_fake.squeeze()) # sort by validity
+        real_or_fake = real_or_fake[sorted_idx]
+        gen_imgs = gen_imgs[sorted_idx]
 
         # Rescale images 0 - 1
         gen_imgs = 0.5 * gen_imgs + 0.5
@@ -171,10 +173,12 @@ class GAN():
 
 
 if __name__ == '__main__':
-    gan = GAN(load=False)
-    gan.train(epochs=30000, batch_size=32, sample_interval=200)
-    #inference = True
-    #if inference == True:
-    #    gan = GAN(load=True)
-    #    gan.sample_images(-1)
+    inference = True
+    train = False
+    if train == True:
+        gan = GAN(load=False)
+        gan.train(epochs=30000, batch_size=32, sample_interval=200)
+    if inference == True:
+        gan = GAN(load=True)
+        gan.sample_images(-1,n=10)
 

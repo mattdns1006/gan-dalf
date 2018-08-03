@@ -3,7 +3,7 @@ from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import Activation 
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
-from keras.layers.convolutional import UpSampling2D, Conv2D
+from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ class GAN():
         self.img_cols = 28
         self.channels = 1
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
-        self.latent_dim = 100
+        self.latent_dim = 14**2 
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -52,15 +52,21 @@ class GAN():
 
     def build_generator(self):
 
+        noise = np.random.normal(0, 1, (1, self.latent_dim))
         model = Sequential()
+        convT = Conv2DTranspose
+        width = int(np.sqrt(self.latent_dim))
+        model.add(Reshape((width,width,1), input_shape=(self.latent_dim,)))
 
-        model.add(Dense(256, input_dim=self.latent_dim))
+        model.add(convT(filters=4,kernel_size=3,strides=(2,2),padding='same'))
         model.add(Activation('relu'))
         model.add(BatchNormalization(momentum=0.8))
+
+        model.add(convT(filters=4,kernel_size=3,strides=(1,1),padding='same'))
+        model.add(Activation('relu'))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Flatten())
         model.add(Dense(512))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(1024))
         model.add(Activation('relu'))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(np.prod(self.img_shape), activation='tanh'))
@@ -173,8 +179,8 @@ class GAN():
 
 
 if __name__ == '__main__':
-    inference = True
-    train = False
+    inference = False
+    train = True 
     if train == True:
         gan = GAN(load=False)
         gan.train(epochs=30000, batch_size=32, sample_interval=200)

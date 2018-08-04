@@ -7,7 +7,8 @@ from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
 import matplotlib.pyplot as plt
-import sys, pdb
+import sys, pdb, cv2
+from loader import Loader
 
 import numpy as np
 
@@ -15,11 +16,11 @@ import numpy as np
 class GAN():
     def __init__(self,load):
         self.load = load 
-        self.img_rows = 28
-        self.img_cols = 28
-        self.channels = 1
-        self.img_shape = (self.img_rows, self.img_cols, self.channels)
-        self.latent_dim = 14**2 
+        self.img_rows = 32 
+        self.img_cols = 32 
+        self.channels = 3
+        self.img_shape = (self.img_rows, self.img_cols,self.channels)
+        self.latent_dim = 16**2 
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -57,18 +58,8 @@ class GAN():
         model = Sequential()
         convT = Conv2DTranspose
         width = int(np.sqrt(self.latent_dim))
-        #model.add(Reshape((width,width,1), input_shape=(self.latent_dim,)))
 
-        #model.add(convT(filters=8,kernel_size=3,strides=(2,2),padding='same'))
-        #model.add(LeakyReLU(0.2))
-        #model.add(BatchNormalization(momentum=0.8))
-
-        #model.add(convT(filters=8,kernel_size=3,strides=(1,1),padding='same'))
-        #model.add(LeakyReLU(0.2))
-        #model.add(BatchNormalization(momentum=0.8))
-
-        
-        model.add(Dense(256,input_shape=(self.latent_dim,)))
+        model.add(Dense(512,input_shape=(self.latent_dim,)))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
 
@@ -83,8 +74,6 @@ class GAN():
         model.add(Dense(np.prod(self.img_shape)))
         model.add(LeakyReLU(0.2))
         model.add(Reshape(self.img_shape))
-
-        model.add(Conv2D(1,5,padding='same'))
         model.add(Activation('tanh'))
 
         print(10*'*'+'Generator'+10*'*')
@@ -98,7 +87,7 @@ class GAN():
     def build_discriminator(self):
 
         model = Sequential()
-        model.add(Flatten(input_shape=(28,28,1,)))
+        model.add(Flatten(input_shape=(self.channels,self.img_cols,self.img_rows,)))
         model.add(Dense(512))
         model.add(LeakyReLU(0.2))
         model.add(Dense(256))
@@ -115,18 +104,26 @@ class GAN():
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
-        # Load the dataset
-        (X_train, _), (_, _) = mnist.load_data()
+        def mnist():
+            (X_train, _), (_, _) = mnist.load_data()
+            X_train = X_train / 127.5 - 1.
+            X_train = np.expand_dims(X_train, axis=3)
+            return X_train
 
-        # Rescale -1 to 1
-        X_train = X_train / 127.5 - 1.
-        X_train = np.expand_dims(X_train, axis=3)
+        dgen = Loader()
+        dgenerator = dgen.data_gen()
 
-        # Adversarial ground truths
+        X_train = next(dgenerator)
+        X_train = X_train[0]
+        X_train = np.expand_dims(X_train,0)
+        X_train = np.tile(X_train,(50,1,1,1))
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
+        noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+        cv2.imwrite('train_images/eg.jpg',dgen.img_norm(X_train[0],inverse=True).astype(np.uint8))
             
         for epoch in range(epochs):
+
             # ---------------------
             #  Train Discriminator
             # ---------------------
@@ -135,7 +132,7 @@ class GAN():
             idx = np.random.randint(0, X_train.shape[0], batch_size)
             imgs = X_train[idx]
 
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
+
 
             # Generate a batch of new images
             gen_imgs = self.generator.predict(noise)
@@ -174,6 +171,7 @@ class GAN():
         sorted_idx = np.argsort(real_or_fake.squeeze()) # sort by validity
         real_or_fake = real_or_fake[sorted_idx]
         gen_imgs = gen_imgs[sorted_idx]
+
 
         # Rescale images 0 - 1
         gen_imgs = 0.5 * gen_imgs + 0.5

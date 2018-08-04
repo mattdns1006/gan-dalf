@@ -6,25 +6,25 @@ import numpy as np
 import pandas as pd
 
 class Loader():
-    def __init__(self,batch_size=20,breed='scottish_deerhound'):
-        self.breed = breed
+    def __init__(self,batch_size=20,grey=True):
         self.batch_size = batch_size
         self.shuffle = True
-
-    def load_cifar10(self,label=8,grey=True):
-        self.dim=(32,32,3)
+        self.grey = True
+        self.dim=[32,32,1]
+        self.dim[2] = 1 if self.grey == True else 3
         self.h, self.w, self.c = self.dim
         self.n_channels = self.c
-        path = '../cifar10/cifar-10-batches-bin/data_batch_3.bin'
-        data = np.fromfile(path,dtype=np.uint8)
-        idx = np.arange(data.size)
-        label_idx = idx[::32*32*3+1]
-        labels = data[label_idx]
-        img_idx = np.setdiff1d(idx,label_idx)
-        imgs = data[img_idx]
-        imgs = imgs.reshape(-1,3,32,32)
-        imgs = imgs.transpose(0,2,3,1)
-        if grey == True:
+
+    def load_cifar10(self,label=8):
+
+        file_path = "cifar-10-batches-py/data_batch_1" 
+        with open(file_path, mode='rb') as file:
+            data = pickle.load(file)
+        imgs = data['data']
+        labels = np.array(data['labels'])
+        imgs = imgs.reshape(-1,self.n_channels,self.h,self.w)
+        imgs = imgs.transpose([0,2,3,1])
+        if self.grey == True:
             imgs = imgs.mean(3)[:,:,:,np.newaxis]
             self.dim = imgs.shape[1:]
         imgs = self.img_norm(imgs)
@@ -36,17 +36,10 @@ class Loader():
 
     def data_gen(self):
         data = self.load_cifar10()
-        pdb.set_trace()
         print("Training examples shape = {0}".format(data.shape))
-        idx = 0
         while True:
-            X = np.empty((self.batch_size,*self.dim))
-            for i in range(self.batch_size):
-                X[i] = data[idx]
-                idx += 1
-                if idx == data.shape[0] - 1:
-                    idx = 0
-            yield X
+            idx = np.random.randint(0,data.shape[0],self.batch_size)
+            yield data[idx]
 
 if __name__ == '__main__':
     dgen = Loader(batch_size=20)

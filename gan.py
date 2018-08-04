@@ -7,19 +7,25 @@ from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
 import matplotlib.pyplot as plt
-import sys, pdb, cv2
+import matplotlib
+matplotlib.use('Agg')
+import sys, pdb, cv2, os
 from loader import Loader
+os.environ["CUDA_VISIBLE_DEVICES"]="1" 
 
 import numpy as np
 
 
 class GAN():
     def __init__(self,load):
+
+        dgen = Loader()
+        self.gen = dgen.data_gen()
         self.load = load 
-        self.img_rows = 32 
-        self.img_cols = 32 
-        self.channels = 3
-        self.img_shape = (self.img_rows, self.img_cols,self.channels)
+        self.img_shape = (dgen.h, dgen.w,dgen.c)
+        self.h = self.img_shape[0]
+        self.w = self.img_shape[1]
+        self.channels = self.img_shape[2]
         self.latent_dim = 16**2 
 
         optimizer = Adam(0.0002, 0.5)
@@ -87,10 +93,10 @@ class GAN():
     def build_discriminator(self):
 
         model = Sequential()
-        model.add(Flatten(input_shape=(self.channels,self.img_cols,self.img_rows,)))
-        model.add(Dense(512))
+        model.add(Flatten(input_shape=(self.channels,self.w,self.h,)))
+        model.add(Dense(128))
         model.add(LeakyReLU(0.2))
-        model.add(Dense(256))
+        model.add(Dense(64))
         model.add(LeakyReLU(0.2))
 
         model.add(Dense(1, activation='sigmoid'))
@@ -110,17 +116,8 @@ class GAN():
             X_train = np.expand_dims(X_train, axis=3)
             return X_train
 
-        dgen = Loader()
-        dgenerator = dgen.data_gen()
-
-        X_train = next(dgenerator)
-        X_train = X_train[0]
-        X_train = np.expand_dims(X_train,0)
-        X_train = np.tile(X_train,(50,1,1,1))
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
-        noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-        cv2.imwrite('train_images/eg.jpg',dgen.img_norm(X_train[0],inverse=True).astype(np.uint8))
             
         for epoch in range(epochs):
 
@@ -129,10 +126,11 @@ class GAN():
             # ---------------------
 
             # Select a random batch of images
+            X_train = next(self.gen)
+            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
             idx = np.random.randint(0, X_train.shape[0], batch_size)
+
             imgs = X_train[idx]
-
-
 
             # Generate a batch of new images
             gen_imgs = self.generator.predict(noise)
@@ -172,20 +170,12 @@ class GAN():
         real_or_fake = real_or_fake[sorted_idx]
         gen_imgs = gen_imgs[sorted_idx]
 
-
         # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
+        gen_imgs = (gen_imgs + 1)*127.5
+        gen_imgs = gen_imgs.astype(np.uint8)
 
-        fig, axs = plt.subplots(r, c,figsize=(20,20))
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].set_title('V={0:.2f}'.format(real_or_fake[cnt][0]))
-                axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/%d.png" % epoch)
-        plt.close()
+        for i in range(gen_imgs.shape[0]):
+            cv2.imwrite("eg/{0}.jpg".format(i),gen_imgs[0])
 
 
     def inference(self):

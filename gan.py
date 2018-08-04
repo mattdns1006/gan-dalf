@@ -57,21 +57,32 @@ class GAN():
         model = Sequential()
         convT = Conv2DTranspose
         width = int(np.sqrt(self.latent_dim))
-        model.add(Reshape((width,width,1), input_shape=(self.latent_dim,)))
+        #model.add(Reshape((width,width,1), input_shape=(self.latent_dim,)))
 
-        model.add(convT(filters=8,kernel_size=3,strides=(2,2),padding='same'))
+        #model.add(convT(filters=8,kernel_size=3,strides=(2,2),padding='same'))
+        #model.add(LeakyReLU(0.2))
+        #model.add(BatchNormalization(momentum=0.8))
+
+        #model.add(convT(filters=8,kernel_size=3,strides=(1,1),padding='same'))
+        #model.add(LeakyReLU(0.2))
+        #model.add(BatchNormalization(momentum=0.8))
+
+        
+        model.add(Dense(256,input_shape=(self.latent_dim,)))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
 
-        model.add(convT(filters=8,kernel_size=3,strides=(1,1),padding='same'))
+        model.add(Dense(512))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Flatten())
-        model.add(Dense(128))
+
+        model.add(Dense(1024))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
+
         model.add(Dense(np.prod(self.img_shape), activation='tanh'))
         model.add(Reshape(self.img_shape))
+
         print(10*'*'+'Generator'+10*'*')
         model.summary()
 
@@ -83,21 +94,10 @@ class GAN():
     def build_discriminator(self):
 
         model = Sequential()
-        model.add(Conv2D(filters=8,kernel_size=3,input_shape=(28,28,1,)))
+        model.add(Flatten(input_shape=(28,28,1,)))
+        model.add(Dense(512))
         model.add(LeakyReLU(0.2))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(MaxPooling2D(pool_size=(2,2)))
-
-        model.add(Conv2D(filters=8,kernel_size=3))
-        model.add(Activation('relu'))
-        model.add(LeakyReLU(0.2))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(MaxPooling2D(pool_size=(2,2)))
-
-        model.add(Flatten(input_shape=self.img_shape))
-        model.add(Dense(32))
-        model.add(LeakyReLU(0.2))
-        model.add(Dense(16))
+        model.add(Dense(256))
         model.add(LeakyReLU(0.2))
         model.add(Dense(1, activation='sigmoid'))
         print(10*'*'+'Discriminator '+10*'*')
@@ -154,10 +154,12 @@ class GAN():
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
+                self.sample_images(epoch)
+            if epoch % 1000 == 0:
                 print("Saving")
                 self.generator.save('gen.h5')
                 self.combined.save('model.h5')
-                self.sample_images(epoch)
+
 
     def sample_images(self, epoch, n = 5):
         r, c = n, n 

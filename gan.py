@@ -80,8 +80,12 @@ class GAN():
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
 
-        model.add(Dense(np.prod(self.img_shape), activation='tanh'))
+        model.add(Dense(np.prod(self.img_shape)))
+        model.add(LeakyReLU(0.2))
         model.add(Reshape(self.img_shape))
+
+        model.add(Conv2D(1,5,padding='same'))
+        model.add(Activation('tanh'))
 
         print(10*'*'+'Generator'+10*'*')
         model.summary()
@@ -99,6 +103,7 @@ class GAN():
         model.add(LeakyReLU(0.2))
         model.add(Dense(256))
         model.add(LeakyReLU(0.2))
+
         model.add(Dense(1, activation='sigmoid'))
         print(10*'*'+'Discriminator '+10*'*')
         model.summary()

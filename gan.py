@@ -1,8 +1,8 @@
 from __future__ import print_function, division
 from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
-from keras.layers import Activation 
-from keras.layers import BatchNormalization, Activation, ZeroPadding2D
+from keras.layers import Activation, LeakyReLU
+from keras.layers import BatchNormalization, Activation, ZeroPadding2D, MaxPooling2D
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import sys, pdb
 
 import numpy as np
+
 
 class GAN():
     def __init__(self,load):
@@ -58,16 +59,16 @@ class GAN():
         width = int(np.sqrt(self.latent_dim))
         model.add(Reshape((width,width,1), input_shape=(self.latent_dim,)))
 
-        model.add(convT(filters=4,kernel_size=3,strides=(2,2),padding='same'))
-        model.add(Activation('relu'))
+        model.add(convT(filters=8,kernel_size=3,strides=(2,2),padding='same'))
+        model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
 
-        model.add(convT(filters=4,kernel_size=3,strides=(1,1),padding='same'))
-        model.add(Activation('relu'))
+        model.add(convT(filters=8,kernel_size=3,strides=(1,1),padding='same'))
+        model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Flatten())
-        model.add(Dense(512))
-        model.add(Activation('relu'))
+        model.add(Dense(128))
+        model.add(LeakyReLU(0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(np.prod(self.img_shape), activation='tanh'))
         model.add(Reshape(self.img_shape))
@@ -82,12 +83,22 @@ class GAN():
     def build_discriminator(self):
 
         model = Sequential()
+        model.add(Conv2D(filters=8,kernel_size=3,input_shape=(28,28,1,)))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(MaxPooling2D(pool_size=(2,2)))
+
+        model.add(Conv2D(filters=8,kernel_size=3))
+        model.add(Activation('relu'))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(MaxPooling2D(pool_size=(2,2)))
 
         model.add(Flatten(input_shape=self.img_shape))
-        model.add(Dense(512))
-        model.add(Activation('relu'))
-        model.add(Dense(256))
-        model.add(Activation('relu'))
+        model.add(Dense(32))
+        model.add(LeakyReLU(0.2))
+        model.add(Dense(16))
+        model.add(LeakyReLU(0.2))
         model.add(Dense(1, activation='sigmoid'))
         print(10*'*'+'Discriminator '+10*'*')
         model.summary()
@@ -109,8 +120,6 @@ class GAN():
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
-
-
             
         for epoch in range(epochs):
             # ---------------------

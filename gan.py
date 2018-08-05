@@ -53,12 +53,12 @@ class GAN():
 
         ConvT = Conv2DTranspose
         model = Sequential()
-        model.add(Dense(512*4*4,input_shape=(self.latent_dim,)))
+        model.add(Dense(256*4*4,input_shape=(self.latent_dim,)))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
-        model.add(Reshape((4,4,512)))
+        model.add(Reshape((4,4,256)))
 
-        model.add(ConvT(256,kernel_size=5,strides=2,padding='same'))
+        model.add(ConvT(128,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 
@@ -66,7 +66,15 @@ class GAN():
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 
-        model.add(ConvT(self.channels,kernel_size=5,strides=2,padding='same'))
+        model.add(ConvT(48,kernel_size=5,strides=2,padding='same'))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization())
+
+        model.add(ConvT(24,kernel_size=5,strides=1,padding='same'))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization())
+
+        model.add(ConvT(self.channels,kernel_size=3,strides=1,padding='same'))
         model.add(Activation('tanh'))
 
         print(10*'*'+'Generator'+10*'*')
@@ -108,6 +116,9 @@ class GAN():
 
         n_batches = 100000
         sample_interval= 1000
+        gen_losses = np.zeros(n_batches) 
+        disc_metrics = np.zeros((n_batches,2))
+
         for i in range(n_batches):
             epoch = self.dgen.epoch
 
@@ -119,15 +130,17 @@ class GAN():
             fake = np.zeros((batch_size, 1))
 
             # Train the discriminator
-            d_loss_real = self.discriminator.train_on_batch(imgs, valid)
-            d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            disc_metrics_real = self.discriminator.train_on_batch(imgs, valid)
+            disc_metrics_fake = self.discriminator.train_on_batch(gen_imgs, fake)
+            disc_metrics[i] = 0.5 * np.add(disc_metrics_real, disc_metrics_fake)
 
             #  Train Generator
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim)) # random noise input
-            g_loss = self.combined.train_on_batch(noise, valid) # train generator by feeding fake images through discriminator which are likely to produce a valid response
-            print ("Epoch %d - batch_no %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch,i,
-                d_loss[0], 100*d_loss[1], g_loss))
+            gen_losses[i] = self.combined.train_on_batch(noise, valid) # train generator by feeding fake images through discriminator which are likely to produce a valid response
+
+            if i > 20:
+                print ("Epoch %d - batch_no %d [D loss: %f, acc.: %.2f%%] [G loss: %f] (Running means (20obs))" % (epoch,i,
+                    disc_metrics[i-20:i,0].mean(), 100*disc_metrics[i-20:i,1].mean(), gen_losses[i-20:i].mean()))
 
             if i % sample_interval == 0:
                 self.save_imgs(imgs,'real')
@@ -137,6 +150,8 @@ class GAN():
                 print("Saving")
                 self.generator.save('gen.h5')
                 self.combined.save('model.h5')
+                np.save('gen', gen_losses)
+                np.save('disc', disc_metrics)
 
     def save_imgs(self,arr,ext):
         arr = self.dgen.img_norm(arr,inverse=True).astype(np.uint8)

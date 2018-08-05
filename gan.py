@@ -34,7 +34,7 @@ class GAN():
         self.channels = self.img_shape[2]
 
         # Distribution params for latent
-        self.latent_dim = 40
+        self.latent_dim = 20
         self.loc = 0
         self.scale = 1
 
@@ -65,16 +65,18 @@ class GAN():
 
         ConvT = Conv2DTranspose
         model = Sequential()
-        model.add(Dense(512*4*4,input_shape=(self.latent_dim,)))
+        
+        init_feats = 128
+        model.add(Dense(init_feats*4*4,input_shape=(self.latent_dim,)))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
-        model.add(Reshape((4,4,512)))
+        model.add(Reshape((4,4,init_feats)))
 
-        model.add(ConvT(128,kernel_size=5,strides=2,padding='same'))
+        model.add(ConvT(64,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 
-        model.add(ConvT(128,kernel_size=5,strides=2,padding='same'))
+        model.add(ConvT(64,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 
@@ -113,7 +115,7 @@ class GAN():
         model.add(BatchNormalization())
 
         model.add(Flatten())
-        model.add(Dense(256))
+        model.add(Dense(128))
         model.add(LeakyReLU(0.2))
         model.add(Dense(1, activation='sigmoid'))
         print(10*'*'+'Discriminator '+10*'*')
@@ -185,12 +187,13 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--inference", default=False, action='store_true', help="Generator inference")
+    parser.add_argument("--train", default=False, action='store_true', help="Train algorithm?")
     ags = parser.parse_args()
+    if ags.train == True:
+            gan = GAN(load=False)
+            gan.train()
     if ags.inference == True:
         gan = GAN(load=True)
         gan.inference()
-    train = False
-    if train == True:
-            gan = GAN(load=False)
-            gan.train()
+
 

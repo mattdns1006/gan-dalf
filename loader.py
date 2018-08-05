@@ -72,9 +72,10 @@ class Loader():
             yield mini_batch
 
     def make_dirs(self):
-        dir_path = "samples"
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
+        dir_paths = ["samples","inference"]
+        for dir_path in dir_paths:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
 
 if __name__ == '__main__':
     dgen = Loader(batch_size=25)

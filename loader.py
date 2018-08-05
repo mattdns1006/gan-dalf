@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 class Loader():
-    def __init__(self,batch_size=20,grey=True):
+    def __init__(self,batch_size=25,grey=True):
         self.batch_size = batch_size
         self.shuffle = True
         self.grey = True
@@ -22,7 +22,7 @@ class Loader():
             data = pickle.load(file)
         imgs = data['data']
         labels = np.array(data['labels'])
-        imgs = imgs.reshape(-1,self.n_channels,self.h,self.w)
+        imgs = imgs.reshape(-1,3,self.h,self.w)
         imgs = imgs.transpose([0,2,3,1])
         if self.grey == True:
             imgs = imgs.mean(3)[:,:,:,np.newaxis]
@@ -36,6 +36,7 @@ class Loader():
 
     def data_gen(self):
         data = self.load_cifar10()
+
         print("Training examples shape = {0}".format(data.shape))
         while True:
             idx = np.random.randint(0,data.shape[0],self.batch_size)
@@ -47,4 +48,4 @@ if __name__ == '__main__':
     data = next(dgenerator)
     data = dgen.img_norm(data,inverse=True).astype(np.uint8)
     for i in range(10):
-        cv2.imwrite('eg/{0}.jpg'.format(i),data[i])
+        cv2.imwrite('eg/img_{0}.jpg'.format(i),data[i])

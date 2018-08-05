@@ -19,14 +19,15 @@ import numpy as np
 class GAN():
     def __init__(self,load):
 
-        dgen = Loader()
-        self.gen = dgen.data_gen()
+        self.dgen = Loader()
+        self.gen = self.dgen.data_gen()
         self.load = load 
-        self.img_shape = (dgen.h, dgen.w,dgen.c)
+        self.batch_size = self.dgen.batch_size
+        self.img_shape = (self.dgen.h, self.dgen.w,self.dgen.c)
         self.h = self.img_shape[0]
         self.w = self.img_shape[1]
         self.channels = self.img_shape[2]
-        self.latent_dim = 16**2 
+        self.latent_dim = 100
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -60,26 +61,22 @@ class GAN():
 
     def build_generator(self):
 
-        noise = np.random.normal(0, 1, (1, self.latent_dim))
+        ConvT = Conv2DTranspose
         model = Sequential()
-        convT = Conv2DTranspose
-        width = int(np.sqrt(self.latent_dim))
-
-        model.add(Dense(512,input_shape=(self.latent_dim,)))
+        model.add(Dense(512*4*4,input_shape=(self.latent_dim,)))
         model.add(LeakyReLU(0.2))
-        model.add(BatchNormalization(momentum=0.8))
+        model.add(BatchNormalization())
+        model.add(Reshape((4,4,512)))
 
-        model.add(Dense(512))
+        model.add(ConvT(256,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
-        model.add(BatchNormalization(momentum=0.8))
+        model.add(BatchNormalization())
 
-        model.add(Dense(1024))
+        model.add(ConvT(64,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
-        model.add(BatchNormalization(momentum=0.8))
+        model.add(BatchNormalization())
 
-        model.add(Dense(np.prod(self.img_shape)))
-        model.add(LeakyReLU(0.2))
-        model.add(Reshape(self.img_shape))
+        model.add(ConvT(1,kernel_size=5,strides=2,padding='same'))
         model.add(Activation('tanh'))
 
         print(10*'*'+'Generator'+10*'*')
@@ -93,12 +90,21 @@ class GAN():
     def build_discriminator(self):
 
         model = Sequential()
-        model.add(Flatten(input_shape=(self.channels,self.w,self.h,)))
-        model.add(Dense(128))
+        model.add(Conv2D(32,kernel_size=5,strides=2,padding='same',input_shape=(self.w,self.h,self.channels,)))
         model.add(LeakyReLU(0.2))
-        model.add(Dense(64))
-        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization())
 
+        model.add(Conv2D(64,kernel_size=5,strides=2,padding='same'))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization())
+
+        model.add(Conv2D(64,kernel_size=5,strides=2,padding='same'))
+        model.add(LeakyReLU(0.2))
+        model.add(BatchNormalization())
+
+        model.add(Flatten())
+        model.add(Dense(256))
+        model.add(LeakyReLU(0.2))
         model.add(Dense(1, activation='sigmoid'))
         print(10*'*'+'Discriminator '+10*'*')
         model.summary()
@@ -108,51 +114,42 @@ class GAN():
 
         return Model(img, validity)
 
-    def train(self, epochs, batch_size=128, sample_interval=50):
+    def train(self, epochs, sample_interval=50):
 
-        def mnist():
-            (X_train, _), (_, _) = mnist.load_data()
-            X_train = X_train / 127.5 - 1.
-            X_train = np.expand_dims(X_train, axis=3)
-            return X_train
-
+        batch_size = self.batch_size
         valid = np.ones((batch_size, 1))
         fake = np.zeros((batch_size, 1))
+
+        def save_imgs(arr,ext):
+            arr = self.dgen.img_norm(arr,inverse=True).astype(np.uint8)
+            for i in range(arr.shape[0]):
+                cv2.imwrite("eg/{0}_{1}.jpg".format(ext,i),arr[i])
             
+
+
         for epoch in range(epochs):
 
-            # ---------------------
-            #  Train Discriminator
-            # ---------------------
-
             # Select a random batch of images
-            X_train = next(self.gen)
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-            idx = np.random.randint(0, X_train.shape[0], batch_size)
+            imgs = next(self.gen)
 
-            imgs = X_train[idx]
+            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
 
             # Generate a batch of new images
             gen_imgs = self.generator.predict(noise)
+            save_imgs(imgs,'real')
+            save_imgs(gen_imgs,'fake')
 
             # Train the discriminator
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
             d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-            # ---------------------
             #  Train Generator
-            # ---------------------
-
             noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-
             # Train the generator (to have the discriminator label samples as valid)
             g_loss = self.combined.train_on_batch(noise, valid)
-
-            # Plot the progress
             print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
-            # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
             if epoch % 1000 == 0:
@@ -165,18 +162,11 @@ class GAN():
         r, c = n, n 
         noise = np.random.normal(0, 1, (r * c, self.latent_dim))
         gen_imgs = self.generator.predict(noise)
-        real_or_fake = self.discriminator.predict(gen_imgs)
-        sorted_idx = np.argsort(real_or_fake.squeeze()) # sort by validity
-        real_or_fake = real_or_fake[sorted_idx]
-        gen_imgs = gen_imgs[sorted_idx]
-
-        # Rescale images 0 - 1
-        gen_imgs = (gen_imgs + 1)*127.5
+        gen_imgs = self.dgen.img_norm(gen_imgs,inverse=True)
         gen_imgs = gen_imgs.astype(np.uint8)
 
         for i in range(gen_imgs.shape[0]):
-            cv2.imwrite("eg/{0}.jpg".format(i),gen_imgs[0])
-
+            cv2.imwrite("eg/fake_{0}.jpg".format(i),gen_imgs[0])
 
     def inference(self):
         pass
@@ -187,7 +177,7 @@ if __name__ == '__main__':
     train = True 
     if train == True:
         gan = GAN(load=False)
-        gan.train(epochs=30000, batch_size=32, sample_interval=200)
+        gan.train(epochs=30000, sample_interval=200)
     if inference == True:
         gan = GAN(load=True)
         gan.sample_images(-1,n=10)

@@ -6,14 +6,14 @@ from keras.layers import BatchNormalization, Activation, ZeroPadding2D, MaxPooli
 from keras.layers.convolutional import UpSampling2D, Conv2D, Conv2DTranspose
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 import sys, pdb, cv2, os
 from loader import Loader
-os.environ["CUDA_VISIBLE_DEVICES"]="1" 
 
-import numpy as np
+os.environ["CUDA_VISIBLE_DEVICES"]="1" 
 
 
 class GAN():
@@ -106,16 +106,17 @@ class GAN():
 
     def train(self):
 
-        valid = np.ones((self.batch_size, 1))
-        fake = np.zeros((self.batch_size, 1))
-
         n_batches = 100000
         sample_interval=50
         for i in range(n_batches):
             epoch = self.dgen.epoch
-            noise = np.random.normal(0, 1, (self.batch_size, self.latent_dim)) # random noise as input to GEN
-            gen_imgs = self.generator.predict(noise) # generate fake images
+
             imgs = next(self.gen) # generate real images
+            batch_size = imgs.shape[0]
+            noise = np.random.normal(0, 1, (batch_size, self.latent_dim)) # random noise as input to GEN
+            gen_imgs = self.generator.predict(noise) # generate fake images
+            valid = np.ones((batch_size, 1))
+            fake = np.zeros((batch_size, 1))
 
             # Train the discriminator
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
@@ -123,7 +124,7 @@ class GAN():
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
             #  Train Generator
-            noise = np.random.normal(0, 1, (self.batch_size, self.latent_dim)) # random noise input
+            noise = np.random.normal(0, 1, (batch_size, self.latent_dim)) # random noise input
             g_loss = self.combined.train_on_batch(noise, valid) # train generator by feeding fake images through discriminator which are likely to produce a valid response
             print ("Epoch %d - batch_no %d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch,i,
                 d_loss[0], 100*d_loss[1], g_loss))

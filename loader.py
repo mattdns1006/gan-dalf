@@ -9,7 +9,7 @@ import pandas as pd
 class Loader():
     def __init__(self,batch_size=25,grey=False):
         self.batch_size = batch_size
-        self.shuffle = True
+        self.shuffle = True 
         self.dim=[32,32,3]
         self.grey = grey 
         self.dim[2] = 1 if grey == 1 else 3
@@ -38,7 +38,11 @@ class Loader():
                 self.dim = imgs.shape[1:]
                 self.c = 1
             imgs = self.img_norm(imgs)
-            yield imgs[np.where(labels==label)] # just take one class at the moment
+            imgs = imgs[np.where(labels==label)] # just take one class at the moment
+            if self.shuffle == True:
+                perm = np.random.permutation(np.arange(imgs.shape[0]))
+                imgs = imgs[perm]
+            yield imgs
 
     def img_norm(self,imgs,inverse=False):
         sf = 1/127.5
@@ -62,7 +66,10 @@ class Loader():
             idx_end = np.min([idx_start+self.batch_size,cifar_batch.shape[0]])
             indices = np.arange(idx_start,idx_end,1)
             total += indices.size
-            yield cifar_batch[indices]
+            mini_batch = cifar_batch[indices]
+            if np.random.uniform() < 0.5: # some augmentation
+                mini_batch = np.flip(mini_batch,2)
+            yield mini_batch
 
     def make_dirs(self):
         dir_path = "samples"

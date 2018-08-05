@@ -107,7 +107,7 @@ class GAN():
     def train(self):
 
         n_batches = 100000
-        sample_interval=50
+        sample_interval= 1000
         for i in range(n_batches):
             epoch = self.dgen.epoch
 
@@ -132,6 +132,7 @@ class GAN():
             if i % sample_interval == 0:
                 self.save_imgs(imgs,'real')
                 self.save_imgs(gen_imgs,'fake_{0}_{1}_'.format(epoch,i))
+                self.save_imgs(gen_imgs,'fake_latest_'.format(epoch,i))
             if i % 1000 == 0:
                 print("Saving")
                 self.generator.save('gen.h5')

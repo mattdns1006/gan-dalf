@@ -31,7 +31,7 @@ class GAN():
 
         optimizer = Adam(0.0002, 0.5)
 
-        # Build and compile the discriminator
+        # Discriminator
         self.discriminator = self.build_discriminator()
         self.discriminator.compile(loss='binary_crossentropy',
             optimizer=optimizer,
@@ -136,8 +136,6 @@ class GAN():
 
             # Generate a batch of new images
             gen_imgs = self.generator.predict(noise)
-            save_imgs(imgs,'real')
-            save_imgs(gen_imgs,'fake')
 
             # Train the discriminator
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
@@ -151,25 +149,12 @@ class GAN():
             print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
             if epoch % sample_interval == 0:
-                self.sample_images(epoch)
+                save_imgs(imgs,'real')
+                save_imgs(gen_imgs,'fake_{0}_'.format(epoch))
             if epoch % 1000 == 0:
                 print("Saving")
                 self.generator.save('gen.h5')
                 self.combined.save('model.h5')
-
-
-    def sample_images(self, epoch, n = 5):
-        r, c = n, n 
-        noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        gen_imgs = self.generator.predict(noise)
-        gen_imgs = self.dgen.img_norm(gen_imgs,inverse=True)
-        gen_imgs = gen_imgs.astype(np.uint8)
-
-        for i in range(gen_imgs.shape[0]):
-            cv2.imwrite("eg/fake_{0}.jpg".format(i),gen_imgs[0])
-
-    def inference(self):
-        pass
 
 
 if __name__ == '__main__':

@@ -62,7 +62,7 @@ class GAN():
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 
-        model.add(ConvT(64,kernel_size=5,strides=2,padding='same'))
+        model.add(ConvT(128,kernel_size=5,strides=2,padding='same'))
         model.add(LeakyReLU(0.2))
         model.add(BatchNormalization())
 

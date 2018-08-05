@@ -44,15 +44,13 @@ class GAN():
         else:
             self.generator = self.build_generator()
 
-        # The generator takes noise as input and generates imgs
+        # Generator(noise) ---> imgs
         z = Input(shape=(self.latent_dim,))
         img = self.generator(z)
 
-        # For the combined model we will only train the generator
-        self.discriminator.trainable = False
+        self.discriminator.trainable = False # Combined model we train the generator
 
-        # The discriminator takes generated images as input and determines validity
-        validity = self.discriminator(img)
+        validity = self.discriminator(img) # Discriminator(image) --> valid or fake?
 
         # The combined model  (stacked generator and discriminator)
         # Trains the generator to fool the discriminator
@@ -116,45 +114,37 @@ class GAN():
 
     def train(self, epochs, sample_interval=50):
 
-        batch_size = self.batch_size
-        valid = np.ones((batch_size, 1))
-        fake = np.zeros((batch_size, 1))
-
-        def save_imgs(arr,ext):
-            arr = self.dgen.img_norm(arr,inverse=True).astype(np.uint8)
-            for i in range(arr.shape[0]):
-                cv2.imwrite("eg/{0}_{1}.jpg".format(ext,i),arr[i])
-            
-
+        valid = np.ones((self.batch_size, 1))
+        fake = np.zeros((self.batch_size, 1))
 
         for epoch in range(epochs):
 
-            # Select a random batch of images
-            imgs = next(self.gen)
-
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-
-            # Generate a batch of new images
-            gen_imgs = self.generator.predict(noise)
+            noise = np.random.normal(0, 1, (self.batch_size, self.latent_dim)) # random noise as input to GEN
+            gen_imgs = self.generator.predict(noise) # generate fake images
+            imgs = next(self.gen) # generate real images
 
             # Train the discriminator
             d_loss_real = self.discriminator.train_on_batch(imgs, valid)
             d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-            d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+            d_loss = 0.5 * np.add(loss_real, loss_fake)
 
             #  Train Generator
-            noise = np.random.normal(0, 1, (batch_size, self.latent_dim))
-            # Train the generator (to have the discriminator label samples as valid)
-            g_loss = self.combined.train_on_batch(noise, valid)
+            noise = np.random.normal(0, 1, (self.batch_size, self.latent_dim)) # random noise input
+            g_loss = self.combined.train_on_batch(noise, valid) # train generator by feeding fake images through discriminator which are likely to produce a valid response
             print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
             if epoch % sample_interval == 0:
-                save_imgs(imgs,'real')
-                save_imgs(gen_imgs,'fake_{0}_'.format(epoch))
+                self.save_imgs(imgs,'real')
+                self.save_imgs(gen_imgs,'fake_{0}_'.format(epoch))
             if epoch % 1000 == 0:
                 print("Saving")
                 self.generator.save('gen.h5')
                 self.combined.save('model.h5')
+
+    def save_imgs(self,arr,ext):
+        arr = self.dgen.img_norm(arr,inverse=True).astype(np.uint8)
+        for i in range(arr.shape[0]):
+            cv2.imwrite("eg/{0}_{1}.jpg".format(ext,i),arr[i])
 
 
 if __name__ == '__main__':
@@ -163,7 +153,4 @@ if __name__ == '__main__':
     if train == True:
         gan = GAN(load=False)
         gan.train(epochs=30000, sample_interval=200)
-    if inference == True:
-        gan = GAN(load=True)
-        gan.sample_images(-1,n=10)
 
